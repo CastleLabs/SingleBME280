@@ -1,6 +1,6 @@
 # Single BME280 with Adafruit IO and Slack integration.
 
-This repository contains a Raspberry Pi script to read data from a BME280 sensor, log the data to Adafruit IO, and send Slack alerts when necessary.
+This repository contains a Raspberry Pi script to read data from a BME280 sensor, log the data to Adafruit IO, and send Slack alerts when necessary. It also includes a web frontend for easy access to settings/configs.
 
 ## Table of Contents
 
