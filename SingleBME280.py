@@ -43,16 +43,12 @@ adafruit_io_client = None
 # Global state tracking for alerts and counters
 alert_states = {
     'high_temp': False,
-    'low_temp': False,
-    'high_humidity': False,
-    'low_humidity': False
+    'low_temp': False
 }
 
 alert_counters = {
     'high_temp': 0,
-    'low_temp': 0,
-    'high_humidity': 0,
-    'low_humidity': 0
+    'low_temp': 0
 }
 
 def send_slack_alert(message):
@@ -98,17 +94,14 @@ def read_settings_from_conf(conf_file):
     settings = {}
     keys = [
         'SENSOR_LOCATION_NAME', 'MINUTES_BETWEEN_READS', 'SENSOR_THRESHOLD_TEMP',
-        'SENSOR_LOWER_THRESHOLD_TEMP', 'SENSOR_THRESHOLD_HUMIDITY',
-        'SENSOR_LOWER_THRESHOLD_HUMIDITY', 'THRESHOLD_COUNT', 'SLACK_API_TOKEN',
+        'SENSOR_LOWER_THRESHOLD_TEMP', 'THRESHOLD_COUNT', 'SLACK_API_TOKEN',
         'SLACK_CHANNEL', 'ADAFRUIT_IO_USERNAME', 'ADAFRUIT_IO_KEY',
-        'ADAFRUIT_IO_GROUP_NAME', 'ADAFRUIT_IO_TEMP_FEED',
-        'ADAFRUIT_IO_HUMIDITY_FEED'
+        'ADAFRUIT_IO_GROUP_NAME', 'ADAFRUIT_IO_TEMP_FEED'
     ]
 
     try:
         for key in keys:
-            if key in ['SENSOR_THRESHOLD_TEMP', 'SENSOR_LOWER_THRESHOLD_TEMP',
-                       'SENSOR_THRESHOLD_HUMIDITY', 'SENSOR_LOWER_THRESHOLD_HUMIDITY']:
+            if key in ['SENSOR_THRESHOLD_TEMP', 'SENSOR_LOWER_THRESHOLD_TEMP']:
                 settings[key] = config.getfloat('General', key)
             elif key in ['MINUTES_BETWEEN_READS', 'THRESHOLD_COUNT']:
                 settings[key] = config.getint('General', key)
@@ -255,7 +248,7 @@ def run_monitoring():
         # Initialize Adafruit IO client
         adafruit_io_client = Client(settings['ADAFRUIT_IO_USERNAME'],
                                   settings['ADAFRUIT_IO_KEY'])
-        group_name = settings['ADAFRUIT_IO_GROUP_NAME']  # Should be 'castle-sensors'
+        group_name = settings['ADAFRUIT_IO_GROUP_NAME']  # e.g., 'castle-sensors'
         logger.info(f"Adafruit IO client initialized successfully for group {group_name}")
     except Exception as e:
         log_error(f"Failed to initialize settings or Adafruit IO client: {e}")
@@ -284,9 +277,8 @@ def run_monitoring():
                     bme280_data = bme280.sample(bus, address, calibration_params)
                     temperature_c = bme280_data.temperature
                     temperature_f = celsius_to_fahrenheit(temperature_c)
-                    humidity = bme280_data.humidity
 
-                    logger.info(f"Read values - Temp: {temperature_f:.1f}°F ({temperature_c:.1f}°C), Humidity: {humidity:.1f}%")
+                    logger.info(f"Read values - Temp: {temperature_f:.1f}°F ({temperature_c:.1f}°C)")
 
                     # Temperature High Threshold
                     if temperature_f >= settings['SENSOR_THRESHOLD_TEMP']:
@@ -316,42 +308,13 @@ def run_monitoring():
                             send_slack_alert(alert_msg)
                             alert_states['low_temp'] = False
 
-                    # Humidity High Threshold
-                    if humidity >= settings['SENSOR_THRESHOLD_HUMIDITY']:
-                        alert_counters['high_humidity'] += 1
-                        if alert_counters['high_humidity'] >= settings['THRESHOLD_COUNT'] and not alert_states['high_humidity']:
-                            alert_msg = f"💧 High humidity alert at {settings['SENSOR_LOCATION_NAME']}: {humidity:.1f}%"
-                            send_slack_alert(alert_msg)
-                            alert_states['high_humidity'] = True
-                    else:
-                        alert_counters['high_humidity'] = 0
-                        if alert_states['high_humidity']:
-                            alert_msg = f"✅ Humidity returned to normal at {settings['SENSOR_LOCATION_NAME']}: {humidity:.1f}%"
-                            send_slack_alert(alert_msg)
-                            alert_states['high_humidity'] = False
-
-                    # Humidity Low Threshold
-                    if humidity <= settings['SENSOR_LOWER_THRESHOLD_HUMIDITY']:
-                        alert_counters['low_humidity'] += 1
-                        if alert_counters['low_humidity'] >= settings['THRESHOLD_COUNT'] and not alert_states['low_humidity']:
-                            alert_msg = f"🌬️ Low humidity alert at {settings['SENSOR_LOCATION_NAME']}: {humidity:.1f}%"
-                            send_slack_alert(alert_msg)
-                            alert_states['low_humidity'] = True
-                    else:
-                        alert_counters['low_humidity'] = 0
-                        if alert_states['low_humidity']:
-                            alert_msg = f"✅ Humidity returned to normal at {settings['SENSOR_LOCATION_NAME']}: {humidity:.1f}%"
-                            send_slack_alert(alert_msg)
-                            alert_states['low_humidity'] = False
-
                     # Log the readings to the log file
                     with open(LOG_FILE, 'a') as file:
                         timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-                        file.write(f"{timestamp} - {settings['SENSOR_LOCATION_NAME']} - Temperature: {temperature_f}°F, Humidity: {humidity}%\n")
+                        file.write(f"{timestamp} - {settings['SENSOR_LOCATION_NAME']} - Temperature: {temperature_f}°F\n")
 
                     # Send the readings to Adafruit IO
                     send_to_adafruit(settings['ADAFRUIT_IO_TEMP_FEED'], temperature_f, settings['ADAFRUIT_IO_GROUP_NAME'])
-                    send_to_adafruit(settings['ADAFRUIT_IO_HUMIDITY_FEED'], humidity, settings['ADAFRUIT_IO_GROUP_NAME'])
 
                     last_read_time = current_time
 
@@ -390,3 +353,4 @@ if __name__ == '__main__':
         shutdown_event.set()
         monitoring_thread.join()
         logger.info("Application has been shut down gracefully.")
+
